@@ -1,0 +1,15 @@
+{
+    "name" : "king-server",
+    "version" : "0.0.1",
+    "private" : true,
+    "scripts" : {
+        "start" : "node app.js"
+    },
+    "dependencies" : {
+        "ws" : "*"
+    },
+    "devDependencies" : {
+        "jasmine-node" : "*",
+        "request" : "*"
+    }
+}
