@@ -29,10 +29,12 @@ Status = {
 
   # Client does not have a name and is therefore blocked from everything except... setting a name!
   unidentified: (data) ->
+    console.log data.action
     switch data.action
       when action.client.setName
         @name = data.value
         @status = Status.nowhere
+        @connection.send(JSON.stringify {action: "confirm", name : @name})
         console.log "A client set its name to #{@name}"
       else
         Status.error "unidentified", data
@@ -97,7 +99,8 @@ Client = (@connection) ->
   @status = Status.unidentified
   @connection.on 'close', =>
     console.log "#{@name} disconnected"
-    lobby.splice(lobby.indexOf(self), 1)
+    lobby.splice(lobby.indexOf(@), 1)
+    clients.splice(clients.indexOf(@), 1)
     console.log "Now there are #{clients.length} clients online."
   @connection.on 'message', (message) =>
     try

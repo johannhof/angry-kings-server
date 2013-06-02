@@ -52,10 +52,15 @@
 
   Status = {
     unidentified: function(data) {
+      console.log(data.action);
       switch (data.action) {
         case action.client.setName:
           this.name = data.value;
           this.status = Status.nowhere;
+          this.connection.send(JSON.stringify({
+            action: "confirm",
+            name: this.name
+          }));
           return console.log("A client set its name to " + this.name);
         default:
           return Status.error("unidentified", data);
@@ -127,7 +132,8 @@
     this.status = Status.unidentified;
     this.connection.on('close', function() {
       console.log("" + _this.name + " disconnected");
-      lobby.splice(lobby.indexOf(self), 1);
+      lobby.splice(lobby.indexOf(_this), 1);
+      clients.splice(clients.indexOf(_this), 1);
       return console.log("Now there are " + clients.length + " clients online.");
     });
     return this.connection.on('message', function(message) {
