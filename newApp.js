@@ -71,6 +71,7 @@
         case action.client.goToLobby:
           console.log("" + this.name + " goes to the lobby");
           lobby.push(this);
+          this.status = Status.lobby;
           console.log("" + lobby.length + " clients are in the lobby");
           return sendLobbyUpdate();
         default:

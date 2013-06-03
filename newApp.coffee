@@ -45,6 +45,7 @@ Status = {
       when action.client.goToLobby
         console.log "#{@name} goes to the lobby"
         lobby.push @
+        @status = Status.lobby
         console.log "#{lobby.length} clients are in the lobby"
         sendLobbyUpdate()
       else

@@ -17,5 +17,11 @@ describe "User Services", ->
       if data.action is "confirm" and data.name is "test" then done()
     @ws.send(JSON.stringify {action: action.client.setName, value: "test"})
 
+  it "should allow the user to go to the lobby", (done) =>
+    @react = (message) ->
+      data = JSON.parse message
+      if data.action is action.server.lobbyUpdate and "test" in data.names then done()
+    @ws.send(JSON.stringify {action: action.client.goToLobby})
+
   it "should successfully close the connection", =>
     @ws.close()
