@@ -92,9 +92,11 @@
           }));
         case action.client.accept:
           console.log("" + this.partner.name + " has accepted");
-          return this.partner.connection.send(JSON.stringify({
+          this.partner.connection.send(JSON.stringify({
             action: action.server.start
           }));
+          this.status = Status.ingame;
+          return this.partner.status = Status.ingame;
         case action.client.deny:
           console.log("" + this.partner.name + " has denied");
           this.partner.connection.send(JSON.stringify({
@@ -114,7 +116,8 @@
         case action.client.turn:
           console.log("" + this.name + " has made his turn");
           return this.partner.connection.send(JSON.stringify({
-            action: action.server.turn
+            action: action.server.turn,
+            value: data.value
           }));
         default:
           return Status.error("ingame", data);
@@ -132,6 +135,9 @@
     this.name = void 0;
     this.status = Status.unidentified;
     this.connection.on('close', function() {
+      if (_this.status === Status.ingame) {
+        _this.partner.connection.send("partner disconnected");
+      }
       console.log("" + _this.name + " disconnected");
       lobby.splice(lobby.indexOf(_this), 1);
       clients.splice(clients.indexOf(_this), 1);

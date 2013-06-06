@@ -27,19 +27,19 @@ getClientByName = (name) ->
 # Represents a players status and handles the corresponding messages. Moar patternz be good.
 Status = {
 
-  # Client does not have a name and is therefore blocked from everything except... setting a name!
+# Client does not have a name and is therefore blocked from everything except... setting a name!
   unidentified: (data) ->
     console.log data.action
     switch data.action
       when action.client.setName
         @name = data.value
         @status = Status.nowhere
-        @connection.send(JSON.stringify {action: "confirm", name : @name})
+        @connection.send(JSON.stringify {action: "confirm", name: @name})
         console.log "A client set its name to #{@name}"
       else
         Status.error "unidentified", data
 
-  # Client is somewhere we do not know.
+# Client is somewhere we do not know.
   nowhere: (data) ->
     switch data.action
       when action.client.goToLobby
@@ -51,7 +51,7 @@ Status = {
       else
         Status.error "nowhere", data
 
-  # Client is in the lobby. He can now challenge other players in the lobby.
+# Client is in the lobby. He can now challenge other players in the lobby.
   lobby: (data) ->
     switch data.action
 
@@ -66,6 +66,8 @@ Status = {
       when action.client.accept
         console.log "#{@partner.name} has accepted"
         @partner.connection.send(JSON.stringify {action: action.server.start})
+        @status = Status.ingame
+        @partner.status = Status.ingame
 
       when action.client.deny
         console.log "#{@partner.name} has denied"
@@ -78,16 +80,16 @@ Status = {
       else
         Status.error "lobby", data
 
-  # Client is currently in a running game.
+# Client is currently in a running game.
   ingame: (data) ->
     switch data.action
       when action.client.turn
         console.log "#{@name} has made his turn"
-        @partner.connection.send(JSON.stringify {action : action.server.turn} )
+        @partner.connection.send(JSON.stringify {action: action.server.turn, value: data.value})
       else
         Status.error "ingame", data
 
-  # Error logs that the status could not handle the data.
+# Error logs that the status could not handle the data.
   error: (status, data) ->
     console.log "Client has the status #{status}. It can not receive the action #{data.action}"
 }
@@ -99,6 +101,8 @@ Client = (@connection) ->
   @name = undefined
   @status = Status.unidentified
   @connection.on 'close', =>
+    if @status is Status.ingame
+      @partner.connection.send "partner disconnected"
     console.log "#{@name} disconnected"
     lobby.splice(lobby.indexOf(@), 1)
     clients.splice(clients.indexOf(@), 1)
