@@ -6,7 +6,9 @@
         "start" : "node app.js"
     },
     "dependencies" : {
-        "ws" : "*"
+        "ws" : "*",
+        "mongoose" : "*",
+        "colors" : "*"
     },
     "devDependencies" : {
         "jasmine-node" : "*",
