@@ -49,26 +49,44 @@ getClientByName = (name) ->
 # Represents a players status and handles the corresponding messages. Moar patternz be good.
 Status = {
 
-# Client does not have a name and is therefore blocked from everything except... setting a name!
+# the very first message we receive needs to be the unique user id
   unidentified: (data) ->
-    console.log data.action
+    if data.action is action.client.setID
+      User.findOne {phoneID: data.id}, (error, user) =>
+        if error then console.log "[ERROR|GLOBAL] Mongo error while finding user".error
+        else
+          if user
+            console.log "[INFO|USER] Found the user in the Database".info
+            @user = user
+            @status = Status.nowhere
+            @connection.send(JSON.stringify {action: action.server.knownUser, name: @user.name})
+          else
+            console.log "[INFO|USER] Could not find the user in the Database".info
+            @connection.send(JSON.stringify {action: action.server.unknownUser})
+            @user = new User({phoneID: data.id})
+            @status = Status.unnamed
+    else Status.error "unidentified", data
+
+# Client does not have a name and is therefore blocked from everything except... setting a name!
+  unnamed: (data) ->
     switch data.action
       when action.client.setName
-        @user.name = data.value
+        @user.name = data.name
         @status = Status.nowhere
         @connection.send(JSON.stringify {action: action.server.confirm, name: @user.name})
-        console.log "A client set its name to #{@user.name}"
+        console.log "[INFO|CLIENT] A client set its name to #{@user.name}".info
+        @user.save()
       else
-        Status.error "unidentified", data
+        Status.error "unnamed", data
 
 # Client is somewhere we do not know.
   nowhere: (data) ->
     switch data.action
       when action.client.goToLobby
-        console.log "#{@user.name} goes to the lobby"
+        console.log "[INFO|CLIENT] #{@user.name} goes to the lobby".info
         lobby.push @
         @status = Status.lobby
-        console.log "#{lobby.length} clients are in the lobby"
+        console.log "[INFO|LOBBY] #{lobby.length} clients are in the lobby".info
         sendLobbyUpdate()
       else
         Status.error "nowhere", data
@@ -78,7 +96,7 @@ Status = {
     switch data.action
 
       when action.client.pair
-        console.log "#{@user.name} wants to pair with #{data.partner.user.name}"
+        console.log "[INFO|LOBBY] #{@user.name} wants to pair with #{data.partner}".info
         @partner = getClientByName data.partner
         @partner.partner = @
         lobby.splice(lobby.indexOf @, 1)
@@ -86,13 +104,15 @@ Status = {
         @partner.connection.send(JSON.stringify {action: action.server.request, partner: @user.name})
 
       when action.client.accept
-        console.log "#{@partner.user.name} has accepted"
+        console.log "[INFO|LOBBY] #{@partner.user.name} has accepted".info
         @partner.connection.send(JSON.stringify {action: action.server.start})
+        @turn = true
+        @partner.turn = false
         @status = Status.ingame
         @partner.status = Status.ingame
 
       when action.client.deny
-        console.log "#{@partner.user.name} has denied"
+        console.log "[INFO|LOBBY] #{@partner.user.name} has denied".info
         @partner.connection.send(JSON.stringify {action: action.server.denied})
         lobby.push @
         lobby.push @partner
@@ -106,8 +126,21 @@ Status = {
   ingame: (data) ->
     switch data.action
       when action.client.turn
-        console.log "[TURN|GAME] #{@user.name} has made his turn".turn
-        @partner.connection.send(JSON.stringify {action: action.server.turn, value: data.value})
+        if @turn
+          @turn = false
+          @partner.turn = true
+          console.log "[TURN|GAME] #{@user.name} has made his turn".turn
+          @partner.connection.send(JSON.stringify {action: action.server.turn, value: data.value})
+        else
+          console.log "[WARNING|GAME] Client #{@user.name} tried to have a turn although his partner is it".warn
+      when action.client.lose
+        console.log "[INFO|GAME] #{@user.name} has announced that he lost".info
+        console.log "[INFO|GAME] #{@partner.user.name} has won the game against #{@user.name}".info
+        @partner.connection.send(JSON.stringify {action: action.server.youWin})
+        @partner.status = Status.nowhere
+        @status = Status.nowhere
+        @partner.partner = undefined
+        @partner = undefined
       else
         Status.error "ingame", data
 
@@ -118,43 +151,36 @@ Status = {
 
 # Holds information about the client such as name and partner.
 # Manages the clients connection and passes it to the status
-Client = (@connection, @user) ->
+Client = (@connection) ->
   @partner = undefined
-  @status = if @user.name then Status.nowhere else Status.unidentified
+  @user = undefined
+  @status = Status.unidentified
+  @turn = false
 
   @connection.on 'close', =>
     # if the player is currently playing we need to take certain steps
     if @status is Status.ingame
-      @partner.connection.send(JSON.stringify {action: action.server.partnerLeft})
+      console.log "[WARNING|CLIENT] Client #{@user.name} left a running game. Notifying partner...".warn
+      # we need try catch here because the partner might have left already by now
+      try
+        @partner.status = Status.nowhere
+        @partner.partner = undefined
+        @partner.connection.send(JSON.stringify {action: action.server.partnerLeft})
+      catch e
 
-    console.log "[INFO|CLIENT] #{@user.name} disconnected".info
+    console.log "[INFO|CLIENT] #{@user?.name} disconnected".info
     lobby.splice(lobby.indexOf(@), 1)
     clients.splice(clients.indexOf(@), 1)
-    console.log "[GLOBAL] Now there are #{clients.length} clients online.".info
+    console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
 
   @connection.on 'message', (message) =>
     try
       data = JSON.parse message
-      if data?.action then @status data
     catch e
-      console.log "Error parsing #{message}: #{e}"
+      console.log "[ERROR|CLIENT] Error parsing message #{message}: #{e}".error
+    if data?.action then @status data
 
 wss.on "connection", (ws) ->
   console.log "[INFO|GLOBAL] A client connected.".info
-
-  # the very first message we receive needs to be the unique user id
-  ws.on "message", (message) ->
-    data = JSON.parse message
-    User.findOne {phoneID: data.id}, (error, user) ->
-      if error then console.log "[ERROR|GLOBAL] Mongo error while finding user".error
-      else
-        if user
-          console.log "[INFO|USER] Found the user in the Database".info
-          console.log "[DEBUG] Mongo find #{user.phoneID}".debug
-          clients.push new Client(ws, user)
-        else
-          console.log "[INFO|USER] Could not find the user in the Database".info
-          ws.send(JSON.stringify {action: action.server.unknownUser})
-          clients.push new Client(ws, new User({phoneID: data.id}))
-
+  clients.push new Client(ws)
   console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
