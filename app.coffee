@@ -32,6 +32,13 @@ User = mongoose.model 'User', mongoose.Schema({
 clients = []
 lobby = []
 
+removeClient = (toRemove, array) ->
+  i = 0
+  for client in array
+    if client.user.phoneID is toRemove.user.phoneID
+      return array.splice(i, 1)
+    i++
+
 # Gets the names, lost and won games of all players in the lobby
 getLobbyNames = (excludeID) ->
   ([client.user.name,
@@ -100,24 +107,23 @@ Status = {
 
       when action.client.pair
         console.log "[INFO|LOBBY] #{@user.name} wants to pair with #{data.partner}".info
-        if data.partner is "TESTDUMMY"
+        if data.partner is "Ray the Dummy"
           @partner = new Dummy()
         else
           @partner = getClientByName data.partner
 
         if @partner and not @partner.partner and @partner.status is Status.lobby
           @partner.partner = @
-          lobby.splice(lobby.indexOf @, 1)
-          lobby.splice(lobby.indexOf @partner, 1)
-          sendLobbyUpdate()
           @partner.connection.send(JSON.stringify {action: action.server.request, partner: @user.name})
         else
-          sendLobbyUpdate()
           @connection.send(JSON.stringify {action: action.server.denied})
           @partner = null
 
       when action.client.accept
         console.log "[INFO|LOBBY] #{@partner.user.name} has accepted".info
+        removeClient @, lobby
+        removeClient @partner, lobby
+        sendLobbyUpdate()
         @partner.connection.send(JSON.stringify {action: action.server.start})
         @turn = true
         @partner.turn = false
@@ -127,8 +133,6 @@ Status = {
       when action.client.deny
         console.log "[INFO|LOBBY] #{@partner.user.name} has denied".info
         @partner.connection.send(JSON.stringify {action: action.server.denied})
-        lobby.push @
-        lobby.push @partner
         @partner.partner = undefined
         @partner = undefined
         sendLobbyUpdate()
@@ -170,29 +174,24 @@ Dummy = ->
   @partner = undefined
   @status = Status.lobby
   @user = {
-    name: "TESTDUMMY"
-    phoneID: "asdasdasd"
+    name: "Ray the Dummy"
+    phoneID: "asdasdasd" + Math.random() * 1000
     won: 999
     lost: 0
   }
-  @connection = {
-    send: (json) =>
-      data = JSON.parse json
-      switch data.action
-        when action.server.request
-          @status {action: action.client.accept}
-          setTimeout =>
-            @status {action: action.client.turn, x: 100, y: -100}
-          , 5000
-        when action.server.turn
-          @status {action: action.client.turn, x: data.x, y: data.y}
-        when action.server.youWin
-          @status {action: action.client.goToLobby}
-        when action.server.partnerLeft
-          @status {action: action.client.goToLobby}
-        else
-        # dont matter
-  }
+  @connection = {}
+  @connection.send = (json) =>
+    data = JSON.parse json
+    switch data.action
+      when action.server.request
+        @status {action: action.client.accept}
+        setTimeout =>
+          @status {action: action.client.turn, x: 100, y: -100}
+        , 5000
+      when action.server.turn
+        @status {action: action.client.turn, x: data.x, y: data.y}
+      else
+      # dont matter
   return @
 
 # Holds information about the client such as name and partner.
@@ -215,9 +214,9 @@ Client = (@connection) ->
       catch e
 
     console.log "[INFO|CLIENT] #{@user?.name} disconnected".info
-    lobby.splice(lobby.indexOf(@), 1)
-    sendLobbyUpdate();
-    clients.splice(clients.indexOf(@), 1)
+    removeClient @, lobby
+    removeClient @, clients
+    sendLobbyUpdate()
     console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
 
   @connection.on 'message', (message) =>
@@ -227,10 +226,18 @@ Client = (@connection) ->
       console.log "[ERROR|CLIENT] Error parsing message #{message}: #{e}".error
     if data?.action then @status data
 
+  return @
+
+# starting point for each connection
 wss.on "connection", (ws) ->
   console.log "[INFO|GLOBAL] A client connected.".info
   clients.push new Client(ws)
   console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
 
-dummy = new Dummy()
-lobby.push dummy
+# DUMMY PARTNER FOR TESTING
+lobby.push new Dummy()
+
+# catches all other exceptions and prevents the server from crashing
+process.on 'uncaughtException', (err) ->
+  console.error err
+  console.log "Error caught by Batman. Node not exiting."
