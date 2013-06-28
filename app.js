@@ -33,29 +33,33 @@
   User = mongoose.model('User', mongoose.Schema({
     name: String,
     phoneID: String,
-    points: Number
+    won: Number,
+    lost: Number
   }));
 
   clients = [];
 
   lobby = [];
 
-  getLobbyNames = function() {
+  getLobbyNames = function(excludeID) {
     var client, _i, _len, _results;
     _results = [];
     for (_i = 0, _len = lobby.length; _i < _len; _i++) {
       client = lobby[_i];
-      _results.push(client.user.name);
+      if (client.user.phoneID !== excludeID) {
+        _results.push([client.user.name, client.user.won || 0, client.user.lost || 0]);
+      }
     }
     return _results;
   };
 
   sendLobbyUpdate = function() {
     var client, names, _i, _len, _results;
-    names = getLobbyNames();
+    console.log(("[INFO|LOBBY] " + lobby.length + " clients are in the lobby: " + (getLobbyNames(null))).info);
     _results = [];
     for (_i = 0, _len = lobby.length; _i < _len; _i++) {
       client = lobby[_i];
+      names = getLobbyNames(client.user.phoneID);
       _results.push(client.connection.send(JSON.stringify({
         action: action.server.lobbyUpdate,
         names: names
@@ -85,7 +89,7 @@
             return console.log("[ERROR|GLOBAL] Mongo error while finding user".error);
           } else {
             if (user) {
-              console.log("[INFO|USER] Found the user in the Database".info);
+              console.log(("[INFO|USER] Found the user " + user.name + " in the Database").info);
               _this.user = user;
               _this.status = Status.nowhere;
               return _this.connection.send(JSON.stringify({
@@ -129,7 +133,6 @@
           console.log(("[INFO|CLIENT] " + this.user.name + " goes to the lobby").info);
           lobby.push(this);
           this.status = Status.lobby;
-          console.log(("[INFO|LOBBY] " + lobby.length + " clients are in the lobby").info);
           return sendLobbyUpdate();
         default:
           return Status.error("nowhere", data);
@@ -140,13 +143,23 @@
         case action.client.pair:
           console.log(("[INFO|LOBBY] " + this.user.name + " wants to pair with " + data.partner).info);
           this.partner = getClientByName(data.partner);
-          this.partner.partner = this;
-          lobby.splice(lobby.indexOf(this, 1));
-          lobby.splice(lobby.indexOf(this.partner, 1));
-          return this.partner.connection.send(JSON.stringify({
-            action: action.server.request,
-            partner: this.user.name
-          }));
+          if (this.partner && !this.partner.partner && this.partner.status === Status.lobby) {
+            this.partner.partner = this;
+            lobby.splice(lobby.indexOf(this, 1));
+            lobby.splice(lobby.indexOf(this.partner, 1));
+            sendLobbyUpdate();
+            return this.partner.connection.send(JSON.stringify({
+              action: action.server.request,
+              partner: this.user.name
+            }));
+          } else {
+            sendLobbyUpdate();
+            this.connection.send(JSON.stringify({
+              action: action.server.denied
+            }));
+            return this.partner = null;
+          }
+          break;
         case action.client.accept:
           console.log(("[INFO|LOBBY] " + this.partner.user.name + " has accepted").info);
           this.partner.connection.send(JSON.stringify({
@@ -166,6 +179,8 @@
           this.partner.partner = void 0;
           this.partner = void 0;
           return sendLobbyUpdate();
+        case action.client.goToLobby:
+          return sendLobbyUpdate();
         default:
           return Status.error("lobby", data);
       }
@@ -179,7 +194,8 @@
             console.log(("[TURN|GAME] " + this.user.name + " has made his turn").turn);
             return this.partner.connection.send(JSON.stringify({
               action: action.server.turn,
-              value: data.value
+              x: data.x,
+              y: data.y
             }));
           } else {
             return console.log(("[WARNING|GAME] Client " + this.user.name + " tried to have a turn although his partner is it").warn);
@@ -204,6 +220,38 @@
     }
   };
 
+  /*
+  Dummy = ->
+    @partner = undefined
+    @status = Status.lobby
+    @user = {
+      name: "TESTDUMMY"
+      phoneID: "asdasdasd"
+      won: 999
+      lost: 0
+    }
+    @connection = {
+      send: (json) =>
+        data = JSON.parse json
+        switch data.action
+          when action.server.request
+            @status {action: action.client.accept}
+            setTimeout =>
+              @status {action: action.client.turn, x: 100, y: -100}
+            , 5000
+          when action.server.turn
+            @status {action: action.client.turn, x: data.x, y: data.y}
+          when action.server.youWin
+            @status {action: action.client.goToLobby}
+          when action.server.partnerLeft
+            @status {action: action.client.goToLobby}
+          else
+          # dont matter
+    }
+    return @
+  */
+
+
   Client = function(connection) {
     var _this = this;
     this.connection = connection;
@@ -227,6 +275,7 @@
       }
       console.log(("[INFO|CLIENT] " + ((_ref = _this.user) != null ? _ref.name : void 0) + " disconnected").info);
       lobby.splice(lobby.indexOf(_this), 1);
+      sendLobbyUpdate();
       clients.splice(clients.indexOf(_this), 1);
       return console.log(("[INFO|GLOBAL] Now there are " + clients.length + " clients online.").info);
     });
@@ -249,5 +298,12 @@
     clients.push(new Client(ws));
     return console.log(("[INFO|GLOBAL] Now there are " + clients.length + " clients online.").info);
   });
+
+  /* testdummy
+  dummy = new Dummy()
+  clients.push dummy
+  lobby.push dummy
+  */
+
 
 }).call(this);

@@ -25,20 +25,24 @@ db.on 'error', console.error.bind(console, 'connection error:')
 User = mongoose.model 'User', mongoose.Schema({
   name: String,
   phoneID: String,
-  points: Number
+  won: Number,
+  lost: Number
 })
 
 clients = []
 lobby = []
 
-# Gets the names of all players in the lobby
-getLobbyNames = ->
-  (client.user.name for client in lobby)
+# Gets the names, lost and won games of all players in the lobby
+getLobbyNames = (excludeID) ->
+  ([client.user.name,
+    client.user.won || 0,
+    client.user.lost || 0] for client in lobby when client.user.phoneID isnt excludeID)
 
 # Sends the names of all players in the lobby to all players in the lobby
 sendLobbyUpdate = ->
-  names = getLobbyNames()
+  console.log "[INFO|LOBBY] #{lobby.length} clients are in the lobby: #{getLobbyNames(null)}".info
   for client in lobby
+    names = getLobbyNames(client.user.phoneID)
     client.connection.send(JSON.stringify {action: action.server.lobbyUpdate, names: names})
 
 # Finds a client by his name
@@ -56,7 +60,7 @@ Status = {
         if error then console.log "[ERROR|GLOBAL] Mongo error while finding user".error
         else
           if user
-            console.log "[INFO|USER] Found the user in the Database".info
+            console.log "[INFO|USER] Found the user #{user.name} in the Database".info
             @user = user
             @status = Status.nowhere
             @connection.send(JSON.stringify {action: action.server.knownUser, name: @user.name})
@@ -86,7 +90,6 @@ Status = {
         console.log "[INFO|CLIENT] #{@user.name} goes to the lobby".info
         lobby.push @
         @status = Status.lobby
-        console.log "[INFO|LOBBY] #{lobby.length} clients are in the lobby".info
         sendLobbyUpdate()
       else
         Status.error "nowhere", data
@@ -98,10 +101,16 @@ Status = {
       when action.client.pair
         console.log "[INFO|LOBBY] #{@user.name} wants to pair with #{data.partner}".info
         @partner = getClientByName data.partner
-        @partner.partner = @
-        lobby.splice(lobby.indexOf @, 1)
-        lobby.splice(lobby.indexOf @partner, 1)
-        @partner.connection.send(JSON.stringify {action: action.server.request, partner: @user.name})
+        if @partner and not @partner.partner and @partner.status is Status.lobby
+          @partner.partner = @
+          lobby.splice(lobby.indexOf @, 1)
+          lobby.splice(lobby.indexOf @partner, 1)
+          sendLobbyUpdate()
+          @partner.connection.send(JSON.stringify {action: action.server.request, partner: @user.name})
+        else
+          sendLobbyUpdate()
+          @connection.send(JSON.stringify {action: action.server.denied})
+          @partner = null
 
       when action.client.accept
         console.log "[INFO|LOBBY] #{@partner.user.name} has accepted".info
@@ -119,6 +128,10 @@ Status = {
         @partner.partner = undefined
         @partner = undefined
         sendLobbyUpdate()
+
+    # if someone restarted his lobby
+      when action.client.goToLobby
+        sendLobbyUpdate()
       else
         Status.error "lobby", data
 
@@ -130,7 +143,7 @@ Status = {
           @turn = false
           @partner.turn = true
           console.log "[TURN|GAME] #{@user.name} has made his turn".turn
-          @partner.connection.send(JSON.stringify {action: action.server.turn, value: data.value})
+          @partner.connection.send(JSON.stringify {action: action.server.turn, x: data.x, y: data.y})
         else
           console.log "[WARNING|GAME] Client #{@user.name} tried to have a turn although his partner is it".warn
       when action.client.lose
@@ -148,6 +161,37 @@ Status = {
   error: (status, data) ->
     console.log "[ERROR|CLIENT] Client has the status #{status}. It can not receive the action #{data.action}".error
 }
+
+###
+Dummy = ->
+  @partner = undefined
+  @status = Status.lobby
+  @user = {
+    name: "TESTDUMMY"
+    phoneID: "asdasdasd"
+    won: 999
+    lost: 0
+  }
+  @connection = {
+    send: (json) =>
+      data = JSON.parse json
+      switch data.action
+        when action.server.request
+          @status {action: action.client.accept}
+          setTimeout =>
+            @status {action: action.client.turn, x: 100, y: -100}
+          , 5000
+        when action.server.turn
+          @status {action: action.client.turn, x: data.x, y: data.y}
+        when action.server.youWin
+          @status {action: action.client.goToLobby}
+        when action.server.partnerLeft
+          @status {action: action.client.goToLobby}
+        else
+        # dont matter
+  }
+  return @
+###
 
 # Holds information about the client such as name and partner.
 # Manages the clients connection and passes it to the status
@@ -170,6 +214,7 @@ Client = (@connection) ->
 
     console.log "[INFO|CLIENT] #{@user?.name} disconnected".info
     lobby.splice(lobby.indexOf(@), 1)
+    sendLobbyUpdate();
     clients.splice(clients.indexOf(@), 1)
     console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
 
@@ -184,3 +229,9 @@ wss.on "connection", (ws) ->
   console.log "[INFO|GLOBAL] A client connected.".info
   clients.push new Client(ws)
   console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
+
+### testdummy
+dummy = new Dummy()
+clients.push dummy
+lobby.push dummy
+###

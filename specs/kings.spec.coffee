@@ -1,6 +1,6 @@
 WebSocket = require "ws"
-config = require "./config.json"
-action = require "./action.json"
+config = require "../config.json"
+action = require "../action.json"
 
 firstUsername = "test"
 secondUsername = "test_partner"
@@ -57,13 +57,13 @@ describe "User Services", ->
     react = (message) ->
       data = JSON.parse message
       if data.action is action.server.confirm and data.name is firstUsername then done()
-    ws.send(JSON.stringify {action: action.client.setName, value: firstUsername})
+    ws.send(JSON.stringify {action: action.client.setName, name: firstUsername})
 
   it "should allow the second user to set a name", (done) =>
     react_partner = (message) ->
       data = JSON.parse message
       if data.action is action.server.confirm and data.name is secondUsername then done()
-    ws_partner.send(JSON.stringify {action: action.client.setName, value: secondUsername})
+    ws_partner.send(JSON.stringify {action: action.client.setName, name: secondUsername})
 
   it "should save the user name", (done) =>
     User.findOne {phoneID: "test"}, (err, user) ->
@@ -73,13 +73,16 @@ describe "Lobby Services", ->
   it "should allow the first user to go to the lobby", (done) =>
     react = (message) ->
       data = JSON.parse message
-      if data.action is action.server.lobbyUpdate and firstUsername in data.names then done()
+      if data.action is action.server.lobbyUpdate and firstUsername not in data.names then done()
     ws.send(JSON.stringify {action: action.client.goToLobby})
 
-  it "should allow the second user to go to the lobby", (done) =>
+  it "should allow the second user to go to the lobby and get data from other players", (done) =>
     react_partner = (message) ->
       data = JSON.parse message
-      if data.action is action.server.lobbyUpdate and firstUsername in data.names and secondUsername in data.names then done()
+      names = (name[0] for name in data.names)
+      won = (name[1] for name in data.names)
+      lost = (name[2] for name in data.names)
+      if data.action is action.server.lobbyUpdate and firstUsername in names and lost[0] is 0 and secondUsername not in names then done()
     ws_partner.send(JSON.stringify {action: action.client.goToLobby})
 
   it "should allow the first user to challenge the second, who denies", (done) =>
@@ -107,21 +110,21 @@ describe "Game Services", ->
   it "should not allow the first user to have the first turn", ->
     react_partner = () ->
       throw "err"
-    ws.send(JSON.stringify {action: action.client.turn, value: 999})
+    ws.send(JSON.stringify {action: action.client.turn, x: 999, y: 999})
 
   it "should allow the second user to have the first turn", ->
     react_partner = ->
     react = (message) ->
       data = JSON.parse message
-      if data.action is action.server.turn and data.value is 999 then done()
-    ws_partner.send(JSON.stringify {action: action.client.turn, value: 999})
+      if data.action is action.server.turn and data.x is 999 and data.y is 999 then done()
+    ws_partner.send(JSON.stringify {action: action.client.turn, x: 999, y: 999})
 
   it "should allow the first user to have the second turn", ->
     react = ->
     react_partner = (message) ->
       data = JSON.parse message
-      if data.action is action.server.turn and data.value is 888 then done()
-    ws.send(JSON.stringify {action: action.client.turn, value: 888})
+      if data.action is action.server.turn and data.x is 888 then done()
+    ws.send(JSON.stringify {action: action.client.turn, x: 888, y: 888})
 
   it "should allow the second user to have the third turn", ->
     react_partner = ->
