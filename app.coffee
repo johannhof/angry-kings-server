@@ -100,7 +100,11 @@ Status = {
 
       when action.client.pair
         console.log "[INFO|LOBBY] #{@user.name} wants to pair with #{data.partner}".info
-        @partner = getClientByName data.partner
+        if data.partner is "TESTDUMMY"
+          @partner = new Dummy()
+        else
+          @partner = getClientByName data.partner
+
         if @partner and not @partner.partner and @partner.status is Status.lobby
           @partner.partner = @
           lobby.splice(lobby.indexOf @, 1)
@@ -162,7 +166,6 @@ Status = {
     console.log "[ERROR|CLIENT] Client has the status #{status}. It can not receive the action #{data.action}".error
 }
 
-###
 Dummy = ->
   @partner = undefined
   @status = Status.lobby
@@ -191,7 +194,6 @@ Dummy = ->
         # dont matter
   }
   return @
-###
 
 # Holds information about the client such as name and partner.
 # Manages the clients connection and passes it to the status
@@ -230,8 +232,5 @@ wss.on "connection", (ws) ->
   clients.push new Client(ws)
   console.log "[INFO|GLOBAL] Now there are #{clients.length} clients online.".info
 
-### testdummy
 dummy = new Dummy()
-clients.push dummy
 lobby.push dummy
-###

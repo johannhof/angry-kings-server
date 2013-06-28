@@ -317,6 +317,7 @@
       <statement-execution>
         <fetch-block-size value="100" />
         <execution-timeout value="20" />
+        <focus-result value="false" />
       </statement-execution>
       <compiler>
         <compile-type value="KEEP" />
