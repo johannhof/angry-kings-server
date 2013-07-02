@@ -8,7 +8,6 @@ lib-cov
 *.gz
 
 config.json
-action.json
 
 pids
 logs

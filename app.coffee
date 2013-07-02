@@ -99,7 +99,7 @@ Status = {
         @status = Status.lobby
         sendLobbyUpdate()
       else
-        Status.error "nowhere", data
+        Status.general.call this, "nowhere", data
 
 # Client is in the lobby. He can now challenge other players in the lobby.
   lobby: (data) ->
@@ -141,7 +141,7 @@ Status = {
       when action.client.goToLobby
         sendLobbyUpdate()
       else
-        Status.error "lobby", data
+        Status.general.call this, "lobby", data
 
 # Client is currently in a running game.
   ingame: (data) ->
@@ -163,7 +163,15 @@ Status = {
         @partner.partner = undefined
         @partner = undefined
       else
-        Status.error "ingame", data
+        Status.general.call this, "ingame", data
+
+  general: (source, data) ->
+    switch data.action
+      when action.client.getName
+        console.log "[INFO|CLIENT] Client #{@user.name} asked for his name".info
+        @connection.send(JSON.stringify {action: action.server.sendName, name: @user.name})
+      else
+        Status.error source, data
 
 # Error logs that the status could not handle the data.
   error: (status, data) ->

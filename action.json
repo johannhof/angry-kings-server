@@ -1,0 +1,26 @@
+{
+    "server" : {
+        "lobbyUpdate" : 1001,
+        "request" : 1002,
+        "start" : 1003,
+        "denied" : 1004,
+        "turn" : 1005,
+        "confirm" : 1006,
+        "partnerLeft" : 1007,
+        "unknownUser" : 1008,
+        "youWin" : 1009,
+        "knownUser" : 1010,
+        "sendName" : 1011
+    },
+    "client" : {
+        "setName" : 2001,
+        "goToLobby" : 2002,
+        "pair" : 2003,
+        "accept" : 2004,
+        "deny" : 2005,
+        "turn" : 2006,
+        "setID" : 2007,
+        "lose" : 2008,
+        "getName" : 2009
+    }
+}

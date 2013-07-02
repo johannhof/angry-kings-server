@@ -147,7 +147,7 @@
           this.status = Status.lobby;
           return sendLobbyUpdate();
         default:
-          return Status.error("nowhere", data);
+          return Status.general.call(this, "nowhere", data);
       }
     },
     lobby: function(data) {
@@ -195,7 +195,7 @@
         case action.client.goToLobby:
           return sendLobbyUpdate();
         default:
-          return Status.error("lobby", data);
+          return Status.general.call(this, "lobby", data);
       }
     },
     ingame: function(data) {
@@ -225,7 +225,19 @@
           this.partner.partner = void 0;
           return this.partner = void 0;
         default:
-          return Status.error("ingame", data);
+          return Status.general.call(this, "ingame", data);
+      }
+    },
+    general: function(source, data) {
+      switch (data.action) {
+        case action.client.getName:
+          console.log(("[INFO|CLIENT] Client " + this.user.name + " asked for his name").info);
+          return this.connection.send(JSON.stringify({
+            action: action.server.sendName,
+            name: this.user.name
+          }));
+        default:
+          return Status.error(source, data);
       }
     },
     error: function(status, data) {

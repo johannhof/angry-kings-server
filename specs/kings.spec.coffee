@@ -44,19 +44,23 @@ describe "User Services", ->
   it "should not find the first user on first login", (done) =>
     react = (message) ->
       data = JSON.parse message
-      if data.action is action.server.unknownUser then done()
+      expect(data.action).toBe(action.server.unknownUser)
+      done()
     ws.send(JSON.stringify {action: action.client.setID, id: "test"})
 
   it "should not find the second user on first login", (done) =>
     react_partner = (message) ->
       data = JSON.parse message
-      if data.action is action.server.unknownUser then done()
+      expect(data.action).toBe(action.server.unknownUser)
+      done()
     ws_partner.send(JSON.stringify {action: action.client.setID, id: "test2"})
 
   it "should allow the first user to set a name", (done) =>
     react = (message) ->
       data = JSON.parse message
-      if data.action is action.server.confirm and data.name is firstUsername then done()
+      expect(data.action).toBe(action.server.confirm)
+      expect(data.name).toBe(firstUsername)
+      done()
     ws.send(JSON.stringify {action: action.client.setName, name: firstUsername})
 
   it "should allow the second user to set a name", (done) =>
@@ -68,6 +72,14 @@ describe "User Services", ->
   it "should save the user name", (done) =>
     User.findOne {phoneID: "test"}, (err, user) ->
       if err then throw err else if user.name is firstUsername then done()
+
+  it "should allow the first user to get his name", (done) =>
+    react = (message) ->
+      data = JSON.parse message
+      expect(data.action).toBe(action.server.sendName)
+      expect(data.name).toBe(firstUsername)
+      done()
+    ws.send(JSON.stringify {action: action.client.getName})
 
 describe "Lobby Services", ->
   it "should allow the first user to go to the lobby", (done) =>
