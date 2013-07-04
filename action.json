@@ -10,7 +10,8 @@
         "unknownUser" : 1008,
         "youWin" : 1009,
         "knownUser" : 1010,
-        "sendName" : 1011
+        "sendName" : 1011,
+        "endTurn" : 1012
     },
     "client" : {
         "setName" : 2001,
@@ -21,6 +22,8 @@
         "turn" : 2006,
         "setID" : 2007,
         "lose" : 2008,
-        "getName" : 2009
+        "getName" : 2009,
+        "endTurn" : 2010,
+        "leaveLobby" : 2011
     }
 }

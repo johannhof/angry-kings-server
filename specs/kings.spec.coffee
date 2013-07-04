@@ -24,8 +24,13 @@ react = ->
 react_partner = ->
 
 describe "Server", ->
-  it "should allow for connection", (done) =>
+
+  beforeEach ->
+    react_partner = ->
+
     react = ->
+
+  it "should allow for connection", (done) =>
     ws = new WebSocket "ws://localhost:#{config.port}"
     ws.on 'open', =>
       done()
@@ -33,7 +38,6 @@ describe "Server", ->
       react(message)
 
   it "should allow for a second connection", (done) =>
-    react = ->
     ws_partner = new WebSocket "ws://localhost:#{config.port}"
     ws_partner.on 'open', =>
       done()
@@ -82,6 +86,12 @@ describe "User Services", ->
     ws.send(JSON.stringify {action: action.client.getName})
 
 describe "Lobby Services", ->
+
+  beforeEach ->
+    react_partner = ->
+
+    react = ->
+
   it "should allow the first user to go to the lobby", (done) =>
     react = (message) ->
       data = JSON.parse message
@@ -119,34 +129,52 @@ describe "Lobby Services", ->
 
 describe "Game Services", ->
 
+  beforeEach ->
+    react_partner = ->
+    react = ->
+
   it "should not allow the first user to have the first turn", ->
     react_partner = () ->
       throw "err"
     ws.send(JSON.stringify {action: action.client.turn, x: 999, y: 999})
 
-  it "should allow the second user to have the first turn", ->
-    react_partner = ->
+  it "should allow the second user to have the first turn", (done) ->
     react = (message) ->
       data = JSON.parse message
       if data.action is action.server.turn and data.x is 999 and data.y is 999 then done()
     ws_partner.send(JSON.stringify {action: action.client.turn, x: 999, y: 999})
 
-  it "should allow the first user to have the second turn", ->
-    react = ->
+  it "should allow the second user to end the first turn", (done) ->
+    array = [{id: 42, x: 999.0, y: 999.0, rotation: 23.23},{id: 23, x: 929.0, y: 933.0, rotation: 23.23}]
+    react = (message) ->
+      data = JSON.parse message
+      expect(data.action).toBe(action.server.endTurn)
+      expect(data.entities).toEqual(array)
+      done()
+    ws_partner.send(JSON.stringify {action: action.client.endTurn, entities: array})
+
+  it "should allow the first user to have the second turn",(done) ->
     react_partner = (message) ->
       data = JSON.parse message
       if data.action is action.server.turn and data.x is 888 then done()
     ws.send(JSON.stringify {action: action.client.turn, x: 888, y: 888})
 
-  it "should allow the second user to have the third turn", ->
-    react_partner = ->
+  it "should allow the first user to end the second turn", (done) ->
+    array = [{id: 42, x: 999.0, y: 999.0, rotation: 23.23},{id: 23, x: 929.0, y: 933.0, rotation: 23.23}]
+    react_partner = (message) ->
+      data = JSON.parse message
+      expect(data.action).toBe(action.server.endTurn)
+      expect(data.entities).toEqual(array)
+      done()
+    ws.send(JSON.stringify {action: action.client.endTurn, entities: array})
+
+  it "should allow the second user to have the third turn", (done) ->
     react = (message) ->
       data = JSON.parse message
-      if data.action is action.server.turn and data.value is 777 then done()
-    ws_partner.send(JSON.stringify {action: action.client.turn, value: 777})
+      if data.action is action.server.turn and data.x is 777 then done()
+    ws_partner.send(JSON.stringify {action: action.client.turn, x: 777, y: 777})
 
-  it "should allow the first user to announce that he lost", ->
-    react = ->
+  it "should allow the first user to announce that he lost", (done) ->
     react_partner = (message) ->
       data = JSON.parse message
       if data.action is action.server.youWin then done()

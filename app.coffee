@@ -76,7 +76,7 @@ Status = {
             @connection.send(JSON.stringify {action: action.server.unknownUser})
             @user = new User({phoneID: data.id})
             @status = Status.unnamed
-    else Status.error "unidentified", data
+    else Status.error "unidentified", data, "unknown"
 
 # Client does not have a name and is therefore blocked from everything except... setting a name!
   unnamed: (data) ->
@@ -88,7 +88,7 @@ Status = {
         console.log "[INFO|CLIENT] A client set its name to #{@user.name}".info
         @user.save()
       else
-        Status.error "unnamed", data
+        Status.error "unnamed", data, "unnamed"
 
 # Client is somewhere we do not know.
   nowhere: (data) ->
@@ -137,6 +137,12 @@ Status = {
         @partner = undefined
         sendLobbyUpdate()
 
+      when action.client.leaveLobby
+        console.log "[INFO|LOBBY] #{@user.name} leaves the lobby".info
+        removeClient @, lobby
+        @status = Status.nowhere
+        sendLobbyUpdate()
+
     # if someone restarted his lobby
       when action.client.goToLobby
         sendLobbyUpdate()
@@ -148,16 +154,37 @@ Status = {
     switch data.action
       when action.client.turn
         if @turn
-          @turn = false
-          @partner.turn = true
           console.log "[TURN|GAME] #{@user.name} has made his turn".turn
           @partner.connection.send(JSON.stringify {action: action.server.turn, x: data.x, y: data.y})
         else
           console.log "[WARNING|GAME] Client #{@user.name} tried to have a turn although his partner is it".warn
+
+      when action.client.endTurn
+        if @turn
+          @turn = false
+          @partner.turn = true
+          console.log "[TURN|GAME] #{@user.name} has ended his turn".turn
+          @partner.connection.send(JSON.stringify {action: action.server.endTurn, entities: data.entities})
+        else
+          console.log "[WARNING|GAME] Client #{@user.name} tried to end a turn although his partner is it".warn
+
       when action.client.lose
         console.log "[INFO|GAME] #{@user.name} has announced that he lost".info
         console.log "[INFO|GAME] #{@partner.user.name} has won the game against #{@user.name}".info
         @partner.connection.send(JSON.stringify {action: action.server.youWin})
+
+        if @partner.user.won
+          @partner.user.won++
+        else
+          @partner.user.won = 1
+
+        if @user.lost
+          @user.lost++
+        else
+          @user.lost = 1
+
+        @user.save()
+        @partner.user.save()
         @partner.status = Status.nowhere
         @status = Status.nowhere
         @partner.partner = undefined
@@ -171,11 +198,11 @@ Status = {
         console.log "[INFO|CLIENT] Client #{@user.name} asked for his name".info
         @connection.send(JSON.stringify {action: action.server.sendName, name: @user.name})
       else
-        Status.error source, data
+        Status.error source, data, @user.name
 
 # Error logs that the status could not handle the data.
-  error: (status, data) ->
-    console.log "[ERROR|CLIENT] Client has the status #{status}. It can not receive the action #{data.action}".error
+  error: (status, data, name) ->
+    console.log "[ERROR|CLIENT] Client #{name} has the status #{status}. It can not receive the action #{data.action}".error
 }
 
 Dummy = ->
@@ -186,8 +213,11 @@ Dummy = ->
     phoneID: "asdasdasd" + Math.random() * 1000
     won: 999
     lost: 0
+    save: ->
   }
   @connection = {}
+  x = 0
+  y = 0
   @connection.send = (json) =>
     data = JSON.parse json
     switch data.action
@@ -196,8 +226,17 @@ Dummy = ->
         setTimeout =>
           @status {action: action.client.turn, x: 100, y: -100}
         , 5000
+        setTimeout =>
+          @status {action: action.client.endTurn, entities: []}
+        , 17000
       when action.server.turn
-        @status {action: action.client.turn, x: data.x, y: data.y}
+        x = - data.x
+        y = data.y
+      when action.server.endTurn
+        @status {action: action.client.turn, x: x, y: y}
+        setTimeout =>
+          @status {action: action.client.endTurn, entities: []}
+        , 12000
       else
       # dont matter
   return @

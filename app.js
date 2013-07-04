@@ -121,7 +121,7 @@
           }
         });
       } else {
-        return Status.error("unidentified", data);
+        return Status.error("unidentified", data, "unknown");
       }
     },
     unnamed: function(data) {
@@ -136,7 +136,7 @@
           console.log(("[INFO|CLIENT] A client set its name to " + this.user.name).info);
           return this.user.save();
         default:
-          return Status.error("unnamed", data);
+          return Status.error("unnamed", data, "unnamed");
       }
     },
     nowhere: function(data) {
@@ -192,6 +192,11 @@
           this.partner.partner = void 0;
           this.partner = void 0;
           return sendLobbyUpdate();
+        case action.client.leaveLobby:
+          console.log(("[INFO|LOBBY] " + this.user.name + " leaves the lobby").info);
+          removeClient(this, lobby);
+          this.status = Status.nowhere;
+          return sendLobbyUpdate();
         case action.client.goToLobby:
           return sendLobbyUpdate();
         default:
@@ -202,8 +207,6 @@
       switch (data.action) {
         case action.client.turn:
           if (this.turn) {
-            this.turn = false;
-            this.partner.turn = true;
             console.log(("[TURN|GAME] " + this.user.name + " has made his turn").turn);
             return this.partner.connection.send(JSON.stringify({
               action: action.server.turn,
@@ -214,12 +217,37 @@
             return console.log(("[WARNING|GAME] Client " + this.user.name + " tried to have a turn although his partner is it").warn);
           }
           break;
+        case action.client.endTurn:
+          if (this.turn) {
+            this.turn = false;
+            this.partner.turn = true;
+            console.log(("[TURN|GAME] " + this.user.name + " has ended his turn").turn);
+            return this.partner.connection.send(JSON.stringify({
+              action: action.server.endTurn,
+              entities: data.entities
+            }));
+          } else {
+            return console.log(("[WARNING|GAME] Client " + this.user.name + " tried to end a turn although his partner is it").warn);
+          }
+          break;
         case action.client.lose:
           console.log(("[INFO|GAME] " + this.user.name + " has announced that he lost").info);
           console.log(("[INFO|GAME] " + this.partner.user.name + " has won the game against " + this.user.name).info);
           this.partner.connection.send(JSON.stringify({
             action: action.server.youWin
           }));
+          if (this.partner.user.won) {
+            this.partner.user.won++;
+          } else {
+            this.partner.user.won = 1;
+          }
+          if (this.user.lost) {
+            this.user.lost++;
+          } else {
+            this.user.lost = 1;
+          }
+          this.user.save();
+          this.partner.user.save();
           this.partner.status = Status.nowhere;
           this.status = Status.nowhere;
           this.partner.partner = void 0;
@@ -237,25 +265,29 @@
             name: this.user.name
           }));
         default:
-          return Status.error(source, data);
+          return Status.error(source, data, this.user.name);
       }
     },
-    error: function(status, data) {
-      return console.log(("[ERROR|CLIENT] Client has the status " + status + ". It can not receive the action " + data.action).error);
+    error: function(status, data, name) {
+      return console.log(("[ERROR|CLIENT] Client " + name + " has the status " + status + ". It can not receive the action " + data.action).error);
     }
   };
 
   Dummy = function() {
-    var _this = this;
+    var x, y,
+      _this = this;
     this.partner = void 0;
     this.status = Status.lobby;
     this.user = {
       name: "Ray the Dummy",
       phoneID: "asdasdasd" + Math.random() * 1000,
       won: 999,
-      lost: 0
+      lost: 0,
+      save: function() {}
     };
     this.connection = {};
+    x = 0;
+    y = 0;
     this.connection.send = function(json) {
       var data;
       data = JSON.parse(json);
@@ -264,19 +296,34 @@
           _this.status({
             action: action.client.accept
           });
-          return setTimeout(function() {
+          setTimeout(function() {
             return _this.status({
               action: action.client.turn,
               x: 100,
               y: -100
             });
           }, 5000);
+          return setTimeout(function() {
+            return _this.status({
+              action: action.client.endTurn,
+              entities: []
+            });
+          }, 17000);
         case action.server.turn:
-          return _this.status({
+          x = -data.x;
+          return y = data.y;
+        case action.server.endTurn:
+          _this.status({
             action: action.client.turn,
-            x: data.x,
-            y: data.y
+            x: x,
+            y: y
           });
+          return setTimeout(function() {
+            return _this.status({
+              action: action.client.endTurn,
+              entities: []
+            });
+          }, 12000);
       }
     };
     return this;
