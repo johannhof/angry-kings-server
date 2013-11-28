@@ -9,11 +9,7 @@
         "partnerLeft" : 1007,
         "unknownUser" : 1008,
         "youWin" : 1009,
-        "knownUser" : 1010,
-        "sendName" : 1011,
-        "endTurn" : 1012,
-        "partnerLeftGameOver" : 1013,
-        "draw" : 1014
+        "knownUser" : 1010
     },
     "client" : {
         "setName" : 2001,
@@ -21,13 +17,8 @@
         "pair" : 2003,
         "accept" : 2004,
         "deny" : 2005,
-        "ready" : 2006,
+        "turn" : 2006,
         "setID" : 2007,
-        "lose" : 2008,
-        "getName" : 2009,
-        "endTurn" : 2010,
-        "leaveLobby" : 2011,
-        "revenge" : 2012,
-        "leaveGameOver" : 2013
+        "lose" : 2008
     }
 }

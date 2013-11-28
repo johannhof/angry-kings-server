@@ -35,13 +35,14 @@ lobby = []
 removeClient = (toRemove, array) ->
   i = 0
   for client in array
-    if client.user.phoneID is toRemove.user.phoneID
+    if client.user?.phoneID is toRemove.user.phoneID
       return array.splice(i, 1)
     i++
 
 # Gets the names, lost and won games of all players in the lobby
 getLobbyNames = (excludeID) ->
   ([client.user.name,
+    client.user._id,
     client.user.won || 0,
     client.user.lost || 0] for client in lobby when client.user.phoneID isnt excludeID)
 
@@ -56,6 +57,12 @@ sendLobbyUpdate = ->
 getClientByName = (name) ->
   for client in lobby
     if name is client.user.name then return client
+
+# Finds a client by his name
+getClientByID = (id) ->
+  for client in lobby
+    # cast id to string
+    if id is client.user._id + "" then return client
 
 # Represents a players status and handles the corresponding messages. Moar patternz be good.
 Status = {
@@ -107,10 +114,10 @@ Status = {
 
       when action.client.pair
         console.log "[INFO|LOBBY] #{@user.name} wants to pair with #{data.partner}".info
-        if data.partner is "Ray the Dummy"
+        if data.partner is "ray"
           @partner = new Dummy()
         else
-          @partner = getClientByName data.partner
+          @partner = getClientByID data.partner
 
         if @partner and not @partner.partner and @partner.status is Status.lobby
           @partner.partner = @
@@ -185,12 +192,40 @@ Status = {
 
         @user.save()
         @partner.user.save()
-        @partner.status = Status.nowhere
-        @status = Status.nowhere
-        @partner.partner = undefined
-        @partner = undefined
+        @partner.status = Status.gameOver
+        @status = Status.gameOver
       else
         Status.general.call this, "ingame", data
+
+  gameOver: (data) ->
+    switch data.action
+      when action.client.revenge
+        if @partner and @partner.status is Status.gameOver
+          console.log "[INFO|GAMEOVER] #{@user.name} wants play again with #{@partner.user.name}".info
+          @partner.connection.send(JSON.stringify {action: action.server.request, partner: @user.name})
+        else
+          @connection.send(JSON.stringify {action: action.server.denied})
+          @partner = null
+
+      when action.client.leaveGameOver
+        console.log "[INFO|GAMEOVER] #{@user.name} leaves the game over area".info
+        @status = Status.nowhere
+        @partner = null
+
+      when action.client.accept
+        console.log "[INFO|LOBBY] #{@partner.user.name} has accepted".info
+        @partner.connection.send(JSON.stringify {action: action.server.start})
+        @turn = true
+        @partner.turn = false
+        @status = Status.ingame
+        @partner.status = Status.ingame
+
+      when action.client.deny
+        console.log "[INFO|LOBBY] #{@partner.user.name} has denied".info
+        @partner.connection.send(JSON.stringify {action: action.server.denied})
+
+      else
+        Status.general.call this, "gameOver", data
 
   general: (source, data) ->
     switch data.action
@@ -210,6 +245,7 @@ Dummy = ->
   @status = Status.lobby
   @user = {
     name: "Ray the Dummy"
+    _id: "ray"
     phoneID: "asdasdasd" + Math.random() * 1000
     won: 999
     lost: 0
