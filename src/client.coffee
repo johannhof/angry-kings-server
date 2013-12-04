@@ -56,6 +56,7 @@ Client = (@connection) ->
 
     @user.save()
     @partner.user.save()
+
     @partner.status = Status.gameOver
     @status = Status.gameOver
 

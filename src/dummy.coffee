@@ -9,29 +9,35 @@ Dummy = ->
     lost: 0
     save: ->
   }
+
+  @lose = -> Client.lose.call this
+  @draw = -> Client.lose.draw this
+
   @connection = {}
   x = 0
   y = 0
+
   @connection.send = (json) =>
     data = JSON.parse json
     switch data.action
       when action.server.request
         @status {action: action.client.accept}
-        setTimeout =>
-          @status {action: action.client.turn, x: 100, y: -100}
-        , 5000
-        setTimeout =>
-          @status {action: action.client.endTurn, entities: []}
-        , 17000
+        @status {action: action.client.ready}
+
       when action.server.turn
+        setTimeout =>
+          @status {action: action.client.endTurn, entities: [], x: 100, y: -100}
+        , 2000
+
+      when action.server.endTurn
         x = - data.x
         y = data.y
-      when action.server.endTurn
-        @status {action: action.client.turn, x: x, y: y}
         setTimeout =>
-          @status {action: action.client.endTurn, entities: []}
-        , 6000
+          @status {action: action.client.ready}
+        , 2000
+
       else
       # dont matter
+
   return @
 

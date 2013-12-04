@@ -251,9 +251,11 @@ Dummy = ->
     lost: 0
     save: ->
   }
+
   @connection = {}
   x = 0
   y = 0
+
   @connection.send = (json) =>
     data = JSON.parse json
     switch data.action

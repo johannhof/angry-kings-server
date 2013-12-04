@@ -1,17 +1,32 @@
 {
-    "name" : "king-server",
-    "version" : "0.0.1",
-    "private" : true,
-    "scripts" : {
-        "start" : "node app.js"
-    },
-    "dependencies" : {
-        "ws" : "*",
-        "mongoose" : "*",
-        "colors" : "*"
-    },
-    "devDependencies" : {
-        "jasmine-node" : "*",
-        "request" : "*"
-    }
+  "name": "king-server",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "ws": "*",
+    "mongoose": "*",
+    "colors": "*"
+  },
+  "devDependencies": {
+    "jasmine-node": "*",
+    "request": "*",
+    "grunt": "~0.4.2",
+    "grunt-contrib-coffee": "~0.7.0",
+    "grunt-sftp-deploy": "0.0.10",
+    "grunt-notify": "~0.2.16"
+  },
+  "description": "angry-kings-server\r ==================",
+  "main": "app.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/johannhof/angry-kings-server.git"
+  },
+  "author": "",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/johannhof/angry-kings-server/issues"
+  }
 }

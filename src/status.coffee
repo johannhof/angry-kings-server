@@ -116,7 +116,6 @@ Status = {
           if @partner.lost
             @draw()
           else
-            console.log @partner.ready
             @lose()
 
       else
@@ -140,6 +139,10 @@ Status = {
           @partner.entityCache = data
 
         @status = Status.notMyTurn
+
+      when action.client.lose
+        console.log "[INFO|GAME] #{@user.name} has resigned".info
+        @lose()
 
       else
         Status.general.call this, "myTurn", data
