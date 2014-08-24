@@ -87,6 +87,7 @@ Status = {
     # if someone restarted his lobby
       when action.client.goToLobby
         sendLobbyUpdate()
+
       else
         Status.general.call this, "lobby", data
 
@@ -95,7 +96,7 @@ Status = {
       when action.client.ready
         console.log "[TURN|GAME] #{@user.name} is ready for another turn".turn
         @ready = true
-        if @partner.ready
+        if @partner && @partner.ready
           console.log "[TURN|GAME] Initiated another turn.".turn
           @partner.connection.send(JSON.stringify {action: action.server.turn})
           @connection.send(JSON.stringify {action: action.server.turn})
@@ -160,7 +161,7 @@ Status = {
       when action.client.leaveGameOver
         console.log "[INFO|GAMEOVER] #{@user.name} leaves the game over area".info
         @status = Status.nowhere
-        @partner.connection.send(JSON.stringify {action: action.server.partnerLeftGameOver})
+        if @partner then @partner.connection.send(JSON.stringify {action: action.server.partnerLeftGameOver})
         @partner = null
 
       when action.client.accept
@@ -175,6 +176,11 @@ Status = {
         console.log "[INFO|LOBBY] #{@partner.user.name} has denied".info
         @partner.connection.send(JSON.stringify {action: action.server.denied})
 
+      # something weird happened and the player is in the lobby
+      when action.client.goToLobby
+        @status = Status.lobby
+        @status(data)
+
       else
         Status.general.call this, "gameOver", data
 
@@ -188,5 +194,5 @@ Status = {
 
 # Error logs that the status could not handle the data.
   error: (status, data, name) ->
-    console.log "[ERROR|CLIENT] Client #{name} has the status #{status}. It can not receive the action #{data.action}".error
+    console.log "[ERROR|CLIENT] #{name} has the status #{status} and can not receive the action #{data.action}".error
 }

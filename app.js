@@ -342,7 +342,7 @@ Status = {
       case action.client.ready:
         console.log(("[TURN|GAME] " + this.user.name + " is ready for another turn").turn);
         this.ready = true;
-        if (this.partner.ready) {
+        if (this.partner && this.partner.ready) {
           console.log("[TURN|GAME] Initiated another turn.".turn);
           this.partner.connection.send(JSON.stringify({
             action: action.server.turn
@@ -420,9 +420,11 @@ Status = {
       case action.client.leaveGameOver:
         console.log(("[INFO|GAMEOVER] " + this.user.name + " leaves the game over area").info);
         this.status = Status.nowhere;
-        this.partner.connection.send(JSON.stringify({
-          action: action.server.partnerLeftGameOver
-        }));
+        if (this.partner) {
+          this.partner.connection.send(JSON.stringify({
+            action: action.server.partnerLeftGameOver
+          }));
+        }
         return this.partner = null;
       case action.client.accept:
         console.log(("[INFO|LOBBY] " + this.partner.user.name + " has accepted").info);
@@ -438,6 +440,9 @@ Status = {
         return this.partner.connection.send(JSON.stringify({
           action: action.server.denied
         }));
+      case action.client.goToLobby:
+        this.status = Status.lobby;
+        return this.status(data);
       default:
         return Status.general.call(this, "gameOver", data);
     }
